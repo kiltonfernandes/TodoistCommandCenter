@@ -5,6 +5,10 @@ from datetime import date
 import pandas as pd
 
 
+def _parse_datetime_series(series):
+    return pd.to_datetime(series, errors="coerce", utc=True).dt.tz_convert(None)
+
+
 def prepare_task_frame(tasks, project_index):
     task_df = pd.DataFrame([dict(task) for task in tasks])
     if task_df.empty:
@@ -29,8 +33,8 @@ def prepare_task_frame(tasks, project_index):
     task_df["root_name"] = task_df["project_id"].map(root_name_map).fillna("Sem projeto")
     task_df["priority"] = pd.to_numeric(task_df["priority"], errors="coerce").fillna(1).astype(int)
     task_df["due_date"] = pd.to_datetime(task_df["due_date"], errors="coerce")
-    task_df["created_at_dt"] = pd.to_datetime(task_df["created_at"], errors="coerce")
-    task_df["completed_at_dt"] = pd.to_datetime(task_df["completed_at"], errors="coerce")
+    task_df["created_at_dt"] = _parse_datetime_series(task_df["created_at"])
+    task_df["completed_at_dt"] = _parse_datetime_series(task_df["completed_at"])
     task_df["due_day"] = task_df["due_date"].dt.date
     task_df["created_day"] = task_df["created_at_dt"].dt.date
     task_df["completed_day"] = task_df["completed_at_dt"].dt.date
