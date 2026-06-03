@@ -88,6 +88,14 @@ class Database:
             rows = conn.execute("SELECT * FROM tasks ORDER BY updated_at DESC").fetchall()
         return [dict(row) for row in rows]
 
+    def fetch_metrics_history(self, limit: int = 14) -> list[dict]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM metrics_daily ORDER BY metric_date DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def upsert_projects(self, projects: list[dict]) -> None:
         now = datetime.utcnow().isoformat()
         with self.connect() as conn:
