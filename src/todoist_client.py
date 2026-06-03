@@ -55,14 +55,32 @@ class TodoistClient:
                 break
         return items
 
+    @staticmethod
+    def _normalize_project(project: dict) -> dict:
+        normalized = dict(project)
+        if "project_id" not in normalized and "id" in normalized:
+            normalized["project_id"] = normalized["id"]
+        if "project_name" not in normalized:
+            normalized["project_name"] = normalized.get("name") or ""
+        return normalized
+
+    @staticmethod
+    def _normalize_task(task: dict) -> dict:
+        normalized = dict(task)
+        if "task_id" not in normalized and "id" in normalized:
+            normalized["task_id"] = normalized["id"]
+        if "created_at" not in normalized and "added_at" in normalized:
+            normalized["created_at"] = normalized["added_at"]
+        return normalized
+
     def fetch_labels(self) -> list[dict]:
         return self._fetch_all("/labels")
 
     def fetch_projects(self) -> list[dict]:
-        return self._fetch_all("/projects")
+        return [self._normalize_project(project) for project in self._fetch_all("/projects")]
 
     def fetch_tasks(self) -> list[dict]:
-        return self._fetch_all("/tasks")
+        return [self._normalize_task(task) for task in self._fetch_all("/tasks")]
 
     def sync(self) -> TodoistSyncResult:
         projects = self.fetch_projects()

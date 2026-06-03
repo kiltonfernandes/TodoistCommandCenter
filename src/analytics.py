@@ -52,24 +52,28 @@ def _task_value(task_row, key: str, default=None):
 
 
 def build_project_index(project_rows) -> dict[str, ProjectNode]:
-    raw = {row["project_id"]: row for row in project_rows}
+    raw = {}
+    for row in project_rows:
+        project_id = _task_value(row, "project_id") or _task_value(row, "id")
+        if project_id is not None:
+            raw[project_id] = row
     memo: dict[str, ProjectNode] = {}
 
     def build(project_id: str) -> ProjectNode:
         if project_id in memo:
             return memo[project_id]
         row = raw[project_id]
-        parent_id = row["parent_id"]
+        parent_id = _task_value(row, "parent_id")
         if parent_id and parent_id in raw:
             parent = build(parent_id)
-            path = f"{parent.path} / {row['project_name']}"
+            path = f"{parent.path} / {_task_value(row, 'project_name') or _task_value(row, 'name') or ''}"
             root_name = parent.root_name
         else:
-            path = row["project_name"]
-            root_name = row["project_name"]
+            path = _task_value(row, "project_name") or _task_value(row, "name") or ""
+            root_name = path
         node = ProjectNode(
             project_id=project_id,
-            name=row["project_name"],
+            name=_task_value(row, "project_name") or _task_value(row, "name") or "",
             parent_id=parent_id,
             path=path,
             root_name=root_name,
@@ -173,7 +177,7 @@ def build_focus_list(tasks, projects, limit: int = 10) -> list[FocusedTask]:
     for task in tasks:
         if _task_value(task, "status") != "open":
             continue
-        node = project_index.get(_task_value(task, "project_id"))
+        node = project_index.get(_task_value(task, "project_id") or _task_value(task, "projectId"))
         project_name = node.path if node else "Sem projeto"
         score, reason = compute_task_score(task, project_name)
         focused.append(

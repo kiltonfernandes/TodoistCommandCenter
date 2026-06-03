@@ -27,5 +27,16 @@ def test_fetch_all_handles_paginated_api(monkeypatch):
     client = TodoistClient("token")
     results = client.fetch_projects()
 
-    assert results == [{"id": "1"}, {"id": "2"}]
+    assert results == [{"id": "1", "project_id": "1", "project_name": ""}, {"id": "2", "project_id": "2", "project_name": ""}]
     assert calls[0][0].endswith("/projects")
+
+
+def test_normalizes_project_and_task_ids():
+    client = TodoistClient("token")
+    project = client._normalize_project({"id": "p1", "name": "Inbox"})
+    task = client._normalize_task({"id": "t1", "added_at": "2026-06-01T10:00:00Z"})
+
+    assert project["project_id"] == "p1"
+    assert project["project_name"] == "Inbox"
+    assert task["task_id"] == "t1"
+    assert task["created_at"] == "2026-06-01T10:00:00Z"

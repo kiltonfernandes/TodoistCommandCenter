@@ -82,6 +82,8 @@ class Database:
         now = datetime.utcnow().isoformat()
         with self.connect() as conn:
             for project in projects:
+                project_id = project.get("project_id") or project.get("id")
+                project_name = project.get("project_name") or project.get("name") or ""
                 conn.execute(
                     """
                     INSERT INTO projects(project_id, project_name, parent_id, color, is_archived, project_order, raw_json, updated_at)
@@ -96,8 +98,8 @@ class Database:
                         updated_at=excluded.updated_at
                     """,
                     (
-                        project["id"],
-                        project["name"],
+                        project_id,
+                        project_name,
                         project.get("parent_id"),
                         project.get("color"),
                         int(bool(project.get("is_archived", False))),
@@ -114,6 +116,7 @@ class Database:
                 due = task.get("due") or {}
                 due_date = due.get("date")
                 created_at = task.get("added_at") or task.get("created_at")
+                task_id = task.get("task_id") or task.get("id")
                 conn.execute(
                     """
                     INSERT INTO tasks(task_id, content, project_id, priority, due_date, created_at, completed_at, status, labels_json, url, description, raw_json, updated_at)
@@ -133,7 +136,7 @@ class Database:
                         updated_at=excluded.updated_at
                     """,
                     (
-                        task["id"],
+                        task_id,
                         task.get("content", ""),
                         task.get("project_id"),
                         int(task.get("priority", 1)),
