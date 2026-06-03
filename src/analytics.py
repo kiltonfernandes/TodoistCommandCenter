@@ -88,7 +88,7 @@ def build_project_index(project_rows) -> dict[str, ProjectNode]:
 
 def compute_task_score(task_row, project_name: str | None, today: date | None = None) -> tuple[int, str]:
     today = today or date.today()
-    due_date = _parse_date(task_row["due_date"])
+    due_date = _parse_date(_task_value(task_row, "due_date"))
     priority = _task_priority(task_row)
     base = _priority_to_weight(priority) * 18
     urgency = 0
@@ -112,7 +112,7 @@ def compute_task_score(task_row, project_name: str | None, today: date | None = 
         reason_bits.append("tem data definida")
     else:
         reason_bits.append("sem data")
-    if task_row["status"] == "completed":
+    if _task_value(task_row, "status") == "completed":
         reason_bits.append("concluída")
     return score, ", ".join(reason_bits)
 

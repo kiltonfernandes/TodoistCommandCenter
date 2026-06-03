@@ -9,36 +9,13 @@ import streamlit as st
 
 from .analytics import build_focus_list, build_mission, compute_metrics
 from .config import get_settings
+from .dataframes import prepare_task_frame
 from .storage import Database
 from .todoist_client import TodoistClient
 
 
 def _load_data(db: Database):
-    with db.connect() as conn:
-        projects = conn.execute("SELECT * FROM projects ORDER BY project_name").fetchall()
-        tasks = conn.execute("SELECT * FROM tasks ORDER BY updated_at DESC").fetchall()
-    return tasks, projects
-
-
-def _prepare_task_frame(tasks, project_index):
-    task_df = pd.DataFrame(tasks)
-    if task_df.empty:
-        return task_df
-    project_path_map = {project_id: node.path for project_id, node in project_index.items()}
-    root_name_map = {project_id: node.root_name for project_id, node in project_index.items()}
-    task_df["project_name"] = task_df["project_id"].map(project_path_map).fillna("Sem projeto")
-    task_df["root_name"] = task_df["project_id"].map(root_name_map).fillna("Sem projeto")
-    task_df["due_date"] = pd.to_datetime(task_df["due_date"], errors="coerce")
-    task_df["created_at_dt"] = pd.to_datetime(task_df["created_at"], errors="coerce")
-    task_df["completed_at_dt"] = pd.to_datetime(task_df["completed_at"], errors="coerce")
-    task_df["due_day"] = task_df["due_date"].dt.date
-    task_df["created_day"] = task_df["created_at_dt"].dt.date
-    task_df["completed_day"] = task_df["completed_at_dt"].dt.date
-    task_df["priority_label"] = "P" + task_df["priority"].astype(str)
-    task_df["labels_text"] = task_df["labels_json"].fillna("[]")
-    today = pd.Timestamp(date.today())
-    task_df["aging_days"] = (today - task_df["created_at_dt"]).dt.days
-    return task_df
+    return db.fetch_tasks(), db.fetch_projects()
 
 
 def _render_task_cards(task_df, limit=6):
@@ -103,7 +80,7 @@ def main():
     selected_priority = st.sidebar.selectbox("Prioridade", ["Todas", "P1", "P2", "P3", "P4"])
     show_completed = st.sidebar.checkbox("Incluir concluídas nos gráficos", value=False)
 
-    task_df = _prepare_task_frame(tasks, project_index)
+    task_df = prepare_task_frame(tasks, project_index)
     left, right = st.columns([1.15, 0.85], gap="large")
 
     with left:

@@ -78,6 +78,16 @@ class Database:
         with self.connect() as conn:
             conn.executescript(SCHEMA)
 
+    def fetch_projects(self) -> list[dict]:
+        with self.connect() as conn:
+            rows = conn.execute("SELECT * FROM projects ORDER BY project_name").fetchall()
+        return [dict(row) for row in rows]
+
+    def fetch_tasks(self) -> list[dict]:
+        with self.connect() as conn:
+            rows = conn.execute("SELECT * FROM tasks ORDER BY updated_at DESC").fetchall()
+        return [dict(row) for row in rows]
+
     def upsert_projects(self, projects: list[dict]) -> None:
         now = datetime.utcnow().isoformat()
         with self.connect() as conn:
