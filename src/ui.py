@@ -5,6 +5,7 @@ from datetime import date
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly.io as pio
 import streamlit as st
 
 from .analytics import build_focus_list, build_mission, compute_metrics
@@ -15,50 +16,129 @@ from .todoist_client import TodoistClient
 
 
 PRIORITY_ORDER = ["P4", "P3", "P2", "P1"]
+PRIORITY_CLASS = {4: "priority-p1", 3: "priority-p2", 2: "priority-p3", 1: "priority-p4"}
 
 
 def _load_data(db: Database):
-    return db.fetch_tasks(), db.fetch_projects(), db.fetch_metrics_history()
+    return db.fetch_tasks(), db.fetch_projects(), db.fetch_metrics_history(), db.fetch_sync_state()
 
 
 def _inject_styles():
     st.markdown(
         """
         <style>
-        .block-container {padding-top: 2rem; max-width: 1480px;}
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        .stApp {
+            background: #0B1020;
+            color: #F8FAFC;
+            font-family: Inter, system-ui, sans-serif;
+        }
+        .block-container {padding-top: 1.25rem; max-width: 1520px;}
+        section[data-testid="stSidebar"] {
+            background: #111827;
+            border-right: 1px solid #25304A;
+        }
+        section[data-testid="stSidebar"] * {color: #CBD5E1;}
+        h1, h2, h3, h4, h5, h6, p, label, span, div {letter-spacing: 0;}
+        h1 {font-size: 42px !important; font-weight: 700 !important; color: #F8FAFC !important;}
+        h3 {font-size: 24px !important; font-weight: 600 !important; color: #F8FAFC !important;}
+        .stMarkdown, .stCaption, .stText {color: #CBD5E1;}
         div[data-testid="stMetric"] {
-            background: #ffffff;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
+            background: #161D2E;
+            border: 1px solid #25304A;
+            border-radius: 12px;
             padding: 0.75rem 0.9rem;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
+        }
+        div[data-testid="stMetric"] label {color: #94A3B8 !important;}
+        div[data-testid="stMetricValue"] {color: #F8FAFC !important;}
+        div[data-testid="stMetricDelta"] {color: #22C55E !important;}
+        div[data-testid="stTabs"] button {color: #CBD5E1;}
+        .mission-header {
+            min-height: 120px;
+            border: 1px solid #25304A;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #0B1020 0%, #111827 58%, #161D2E 100%);
+            padding: 1.25rem 1.35rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+        }
+        .mission-header-grid {
+            display: grid;
+            grid-template-columns: 1.5fr repeat(3, minmax(130px, 0.5fr));
+            gap: 1rem;
+            align-items: center;
+        }
+        .mission-title {
+            color: #F8FAFC;
+            font-size: 2.35rem;
+            line-height: 1;
+            font-weight: 700;
+        }
+        .mission-subtitle {color: #94A3B8; margin-top: 0.35rem; font-size: 0.95rem;}
+        .mission-header-stat {
+            border-left: 1px solid #25304A;
+            padding-left: 1rem;
+        }
+        .mission-header-stat-label {
+            color: #64748B;
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            font-weight: 700;
+        }
+        .mission-header-stat-value {
+            color: #F8FAFC;
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-top: 0.25rem;
         }
         .deck-card {
-            border: 1px solid #dbe3ef;
-            border-radius: 8px;
+            border: 1px solid #25304A;
+            border-radius: 16px;
             padding: 1rem;
-            background: #ffffff;
+            background: #161D2E;
             min-height: 128px;
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.18);
+            transition: transform 200ms ease, border-color 200ms ease, background 200ms ease;
+        }
+        .deck-card:hover, .task-card:hover {
+            transform: translateY(-2px);
+            border-color: #3B82F6;
+            background: #1B2438;
         }
         .deck-kicker {
-            color: #64748b;
-            font-size: 0.78rem;
+            color: #64748B;
+            font-size: 0.68rem;
             text-transform: uppercase;
-            letter-spacing: 0;
+            letter-spacing: 0.12em;
+            font-weight: 700;
             margin-bottom: 0.25rem;
         }
         .deck-value {
-            color: #0f172a;
+            color: #F8FAFC;
             font-size: 1.25rem;
             font-weight: 700;
             line-height: 1.25;
         }
-        .deck-note {color: #475569; font-size: 0.88rem; margin-top: 0.5rem;}
+        .deck-note {color: #CBD5E1; font-size: 0.88rem; margin-top: 0.5rem;}
+        .mission-panel {
+            min-height: 220px;
+            border-left: 6px solid #3B82F6;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.18), #161D2E 52%);
+        }
+        .briefing-panel {
+            min-height: 220px;
+            border-left: 6px solid #8B5CF6;
+        }
         .task-card {
-            border: 1px solid #d8dee8;
-            border-radius: 8px;
+            border: 1px solid #25304A;
+            border-radius: 16px;
             padding: 0.85rem;
-            background: #ffffff;
+            background: #161D2E;
             margin-bottom: 0.65rem;
+            min-height: 150px;
+            transition: transform 200ms ease, border-color 200ms ease, background 200ms ease;
         }
         .badge {
             display: inline-block;
@@ -66,12 +146,27 @@ def _inject_styles():
             padding: 0.12rem 0.45rem;
             margin-right: 0.25rem;
             font-size: 0.72rem;
-            border: 1px solid #cbd5e1;
-            color: #334155;
-            background: #f8fafc;
+            border: 1px solid #25304A;
+            color: #CBD5E1;
+            background: #111827;
         }
-        .badge-hot {background: #fee2e2; border-color: #fecaca; color: #991b1b;}
+        .badge-hot, .priority-p1 {background: rgba(239, 68, 68, 0.16); border-color: #EF4444; color: #FCA5A5;}
+        .priority-p2 {background: rgba(245, 158, 11, 0.16); border-color: #F59E0B; color: #FCD34D;}
+        .priority-p3 {background: rgba(59, 130, 246, 0.16); border-color: #3B82F6; color: #93C5FD;}
+        .priority-p4 {background: rgba(100, 116, 139, 0.16); border-color: #64748B; color: #CBD5E1;}
         .insight-list li {margin-bottom: 0.35rem;}
+        .mission-section-title {
+            color: #F8FAFC;
+            font-size: 1.35rem;
+            font-weight: 700;
+            margin: 1.4rem 0 0.8rem;
+        }
+        .stProgress > div > div {background-color: #25304A;}
+        .stProgress > div > div > div {background: linear-gradient(90deg, #3B82F6, #22C55E);}
+        @media (max-width: 900px) {
+            .mission-header-grid {grid-template-columns: 1fr;}
+            .mission-header-stat {border-left: none; padding-left: 0; border-top: 1px solid #25304A; padding-top: 0.75rem;}
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -91,7 +186,25 @@ def _metric_delta(metric_name: str, current_value, history):
     if delta == 0:
         return "0"
     sign = "+" if delta > 0 else ""
-    return f"{sign}{delta:g} vs ultimo snapshot"
+    return f"{sign}{delta:g} vs snapshot"
+
+
+def _format_last_sync(sync_state):
+    if not sync_state or not sync_state.get("last_sync"):
+        return "Not synced"
+    try:
+        synced_at = pd.Timestamp(sync_state["last_sync"])
+        now = pd.Timestamp.utcnow().tz_localize(None)
+        synced_at = synced_at.tz_localize(None) if synced_at.tzinfo else synced_at
+        minutes = max(0, int((now - synced_at).total_seconds() // 60))
+    except Exception:
+        return sync_state["last_sync"]
+    if minutes < 1:
+        return "Just now"
+    if minutes < 60:
+        return f"{minutes} min ago"
+    hours = minutes // 60
+    return f"{hours} h ago"
 
 
 def _apply_filters(task_df, selected_root, selected_priority, show_completed):
@@ -140,14 +253,14 @@ def _focus_now_card(focused):
         st.info("Sincronize o Todoist para calcular o foco atual.")
         return
     item = focused[0]
-    hot = "badge badge-hot" if item.priority >= 4 else "badge"
+    priority_class = PRIORITY_CLASS.get(item.priority, "priority-p4")
     st.markdown(
         f"""
         <div class="deck-card">
           <div class="deck-kicker">Focus Now</div>
           <div class="deck-value">{item.content}</div>
           <div style="margin-top: 0.65rem;">
-            <span class="{hot}">P{item.priority}</span>
+            <span class="badge {priority_class}">P{item.priority}</span>
             <span class="badge">{item.project_name}</span>
             <span class="badge">score {item.score}</span>
           </div>
@@ -182,10 +295,11 @@ def _risk_panel(metrics):
 
 
 def _mission_panel(mission_text):
-    st.markdown("#### Missao do Dia")
+    st.markdown("<div class='mission-section-title'>Mission Center</div>", unsafe_allow_html=True)
     st.markdown(
         f"""
-        <div class="deck-card">
+        <div class="deck-card mission-panel">
+          <div class="deck-kicker">Mission of the Day</div>
           <pre style="white-space: pre-wrap; margin: 0; font-family: inherit;">{mission_text}</pre>
         </div>
         """,
@@ -195,28 +309,28 @@ def _mission_panel(mission_text):
 
 def _flight_deck(metrics, filtered_df):
     focus_score = metrics["focus_score"]
-    stress = "Baixo"
+    stress = "LOW"
     if metrics["due_today"] >= 5 or metrics["overdue_tasks"] >= 3 or focus_score < 55:
-        stress = "Alto"
+        stress = "HIGH"
     elif metrics["due_today"] >= 2 or focus_score < 75:
-        stress = "Medio"
-    status = "Operacional" if focus_score >= 50 else "Critico"
-    mission_project = "Sem projeto"
-    next_window = "Sem prazo definido"
+        stress = "MEDIUM"
+    status = "OPERATIONAL" if focus_score >= 50 else "CRITICAL"
+    mission_project = "NO PROJECT"
+    next_window = "NO WINDOW"
     if not filtered_df.empty:
         root_counts = filtered_df[filtered_df["status"] == "open"].groupby("root_name").size().sort_values(ascending=False)
         if not root_counts.empty:
-            mission_project = root_counts.index[0]
+            mission_project = str(root_counts.index[0]).upper()
         dated = filtered_df[filtered_df["status"] == "open"].dropna(subset=["due_date"]).sort_values("due_date")
         if not dated.empty:
             next_window = dated.iloc[0]["due_date"].date().isoformat()
 
     cols = st.columns(4)
     cards = [
-        ("Sistema", status, f"Backlog health: {focus_score}%"),
-        ("Stress Level", stress, f"{metrics['due_today']} hoje / {metrics['overdue_tasks']} atrasadas"),
-        ("Missao Atual", mission_project, f"{metrics['open_tasks']} tarefas abertas"),
-        ("Proxima Janela", next_window, f"{metrics['due_next_7']} nos proximos 7 dias"),
+        ("System Status", status, f"{focus_score}% health"),
+        ("Stress Level", stress, f"{metrics['due_today']} due today"),
+        ("Active Mission", mission_project, f"{metrics['open_tasks']} open tasks"),
+        ("Next Window", next_window, f"{metrics['due_next_7']} next 7 days"),
     ]
     for col, (kicker, value, note) in zip(cols, cards):
         with col:
@@ -237,8 +351,8 @@ def _render_kpis(metrics, history):
     items = [
         ("Abertas", metrics["open_tasks"], "open_tasks"),
         ("Atrasadas", metrics["overdue_tasks"], "overdue_tasks"),
-        ("Concluidas hoje", metrics["completed_today"], "completed_today"),
-        ("Taxa semanal", f"{metrics['completion_rate']}%", "completion_rate"),
+        ("Completed today", metrics["completed_today"], "completed_today"),
+        ("Weekly rate", f"{metrics['completion_rate']}%", "completion_rate"),
         ("Focus score", metrics["focus_score"], "focus_score"),
         ("Prox. 7 dias", metrics["due_next_7"], "due_next_7"),
     ]
@@ -246,23 +360,56 @@ def _render_kpis(metrics, history):
         col.metric(label, value, delta=_metric_delta(key, value, history))
 
 
+def _render_header(metrics, filtered_df, sync_state):
+    current_mission = "NO ACTIVE MISSION"
+    if not filtered_df.empty:
+        root_counts = filtered_df[filtered_df["status"] == "open"].groupby("root_name").size().sort_values(ascending=False)
+        if not root_counts.empty:
+            current_mission = str(root_counts.index[0]).upper()
+    st.markdown(
+        f"""
+        <div class="mission-header">
+          <div class="mission-header-grid">
+            <div>
+              <div class="mission-title">TODOIST MISSION CONTROL</div>
+              <div class="mission-subtitle">Personal Operations Center</div>
+            </div>
+            <div class="mission-header-stat">
+              <div class="mission-header-stat-label">Current Mission</div>
+              <div class="mission-header-stat-value">{current_mission}</div>
+            </div>
+            <div class="mission-header-stat">
+              <div class="mission-header-stat-label">Backlog Health</div>
+              <div class="mission-header-stat-value">{metrics["focus_score"]}%</div>
+            </div>
+            <div class="mission-header-stat">
+              <div class="mission-header-stat-label">Last Sync</div>
+              <div class="mission-header-stat-value">{_format_last_sync(sync_state)}</div>
+            </div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _render_critical_tasks(focused):
-    st.markdown("#### Tarefas Criticas")
+    st.markdown("<div class='mission-section-title'>Critical Tasks Area</div>", unsafe_allow_html=True)
     if not focused:
         st.info("Nenhuma tarefa aberta para priorizar ainda.")
         return
     cols = st.columns(5)
     for col, item in zip(cols, focused[:5]):
         with col:
-            hot = "badge badge-hot" if item.priority >= 4 else "badge"
+            priority_class = PRIORITY_CLASS.get(item.priority, "priority-p4")
             st.markdown(
                 f"""
                 <div class="task-card">
-                  <span class="{hot}">P{item.priority}</span>
-                  <span class="badge">{item.score}</span>
+                  <span class="badge {priority_class}">P{item.priority}</span>
+                  <span class="badge">{item.project_name}</span>
                   <div style="font-weight: 700; margin-top: 0.5rem;">{item.content}</div>
-                  <div class="deck-note">{item.project_name}</div>
-                  <div class="deck-note">{item.reason}</div>
+                  <div class="deck-note">Impact: High</div>
+                  <div class="deck-note">Risk: {item.reason}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -270,7 +417,7 @@ def _render_critical_tasks(focused):
 
 
 def _render_priority_matrix(task_df):
-    st.markdown("#### Prioridade x Prazo")
+    st.markdown("#### Risk Matrix")
     if task_df.empty:
         st.info("Sem tarefas para montar a matriz.")
         return
@@ -299,7 +446,7 @@ def _render_priority_matrix(task_df):
 
 
 def _render_workload_allocation(task_df):
-    st.markdown("#### Workload Allocation")
+    st.markdown("<div class='mission-section-title'>Workload Command View</div>", unsafe_allow_html=True)
     if task_df.empty:
         st.info("Sem tarefas para calcular carga.")
         return
@@ -317,7 +464,7 @@ def _render_workload_allocation(task_df):
 
 
 def _render_insights(task_df, metrics):
-    st.markdown("#### Insights")
+    st.markdown("<div class='mission-section-title'>Tactical Insights</div>", unsafe_allow_html=True)
     if task_df.empty:
         st.info("Sem dados suficientes para gerar insights.")
         return
@@ -340,13 +487,15 @@ def _render_insights(task_df, metrics):
         aging_sentence,
     ]
     st.markdown(
-        "<ul class='insight-list'>" + "".join(f"<li>{item}</li>" for item in insights) + "</ul>",
+        "<div class='deck-card briefing-panel'><div class='deck-kicker'>Intelligence Report</div><ul class='insight-list'>"
+        + "".join(f"<li>{item}</li>" for item in insights)
+        + "</ul></div>",
         unsafe_allow_html=True,
     )
 
 
 def _render_timeline(task_df):
-    st.markdown("#### Roadmap dos Proximos 14 Dias")
+    st.markdown("#### Mission Timeline")
     if task_df.empty:
         st.info("Sem tarefas para timeline.")
         return
@@ -368,22 +517,24 @@ def _render_timeline(task_df):
 
 
 def _render_task_cards(task_df, limit=6):
-    st.markdown("#### Cards de Contexto")
+    st.markdown("<div class='mission-section-title'>Active Operations</div>", unsafe_allow_html=True)
     if task_df.empty:
         st.info("Sem tarefas para exibir em cards.")
         return
     for _, row in task_df.head(limit).iterrows():
         due = _due_label(row)
         aging = int(row["aging_days"]) if pd.notna(row.get("aging_days")) else 0
-        hot = "badge badge-hot" if int(row["priority"]) >= 4 else "badge"
+        priority_class = PRIORITY_CLASS.get(int(row["priority"]), "priority-p4")
         st.markdown(
             f"""
             <div class="task-card">
-              <span class="{hot}">P{int(row['priority'])}</span>
+              <div class="deck-kicker">Operation</div>
+              <span class="badge {priority_class}">P{int(row['priority'])}</span>
               <span class="badge">{row['root_name']}</span>
               <div style="font-weight: 700; margin-top: 0.5rem;">{row['content']}</div>
-              <div class="deck-note">{row['project_name']}</div>
-              <div class="deck-note">{due} | Aging: {aging} dia(s)</div>
+              <div class="deck-note">Status: Active</div>
+              <div class="deck-note">Due: {due} | Aging: {aging} dia(s)</div>
+              <div class="deck-note">Blocking: {row['project_name']}</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -391,13 +542,13 @@ def _render_task_cards(task_df, limit=6):
 
 
 def _render_analytics(task_df):
-    tab_matrix, tab_time, tab_backlog = st.tabs(["Prioridade e prazo", "Tempo", "Backlog"])
+    tab_matrix, tab_deadlines, tab_velocity, tab_backlog = st.tabs(["Mission Risk", "Deadlines", "Velocity", "Backlog Health"])
     with tab_matrix:
         _render_priority_matrix(task_df)
-    with tab_time:
+    with tab_deadlines:
         left, right = st.columns(2)
         with left:
-            st.markdown("#### Heatmap de prazos")
+            st.markdown("#### Deadline Heatmap")
             heatmap_df = task_df[task_df["status"] == "open"].dropna(subset=["due_date"]).copy()
             if not heatmap_df.empty:
                 pivot = (
@@ -413,7 +564,7 @@ def _render_analytics(task_df):
                 fig = px.imshow(
                     pivot,
                     aspect="auto",
-                    color_continuous_scale="Blues",
+                    color_continuous_scale=["#22C55E", "#F59E0B", "#EF4444"],
                     labels={"x": "Dia", "y": "Prioridade", "color": "Tarefas"},
                 )
                 fig.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10))
@@ -422,10 +573,10 @@ def _render_analytics(task_df):
                 st.info("Sem prazos suficientes para o heatmap.")
         with right:
             _render_timeline(task_df)
-    with tab_backlog:
+    with tab_velocity:
         left, right = st.columns(2)
         with left:
-            st.markdown("#### Tendencia semanal")
+            st.markdown("#### Velocity Telemetry")
             trend_df = task_df.copy()
             trend_df["created_week"] = trend_df["created_day"].apply(
                 lambda d: pd.Timestamp(d).to_period("W").start_time.date() if pd.notna(d) else None
@@ -440,34 +591,35 @@ def _render_analytics(task_df):
             fig = go.Figure()
             fig.add_trace(go.Bar(x=merged["week"], y=merged["created"], name="Criadas"))
             fig.add_trace(go.Bar(x=merged["week"], y=merged["completed"], name="Concluidas"))
+            fig.add_trace(go.Scatter(x=merged["week"], y=merged["created"] - merged["completed"], name="Net backlog", mode="lines+markers"))
             fig.update_layout(barmode="group", xaxis_title="Semana", yaxis_title="Tarefas", height=320)
             st.plotly_chart(fig, use_container_width=True)
         with right:
-            st.markdown("#### Aging do backlog")
-            aging_df = task_df[task_df["status"] == "open"].dropna(subset=["aging_days"]).copy()
-            if not aging_df.empty:
-                aging_df["aging_bucket"] = pd.cut(
-                    aging_df["aging_days"],
-                    bins=[-1, 2, 7, 14, 30, 9999],
-                    labels=["0-2", "3-7", "8-14", "15-30", "30+"],
-                )
-                aging_summary = aging_df.groupby("aging_bucket", observed=False).size().reset_index(name="tasks")
-                fig = px.bar(aging_summary, x="aging_bucket", y="tasks", labels={"aging_bucket": "Faixa", "tasks": "Tarefas"})
-                fig.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10))
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("Sem backlog aberto para aging.")
+            _render_workload_allocation(task_df)
+    with tab_backlog:
+        st.markdown("#### Backlog Health")
+        aging_df = task_df[task_df["status"] == "open"].dropna(subset=["aging_days"]).copy()
+        if not aging_df.empty:
+            aging_df["aging_bucket"] = pd.cut(
+                aging_df["aging_days"],
+                bins=[-1, 2, 7, 14, 30, 9999],
+                labels=["0-2", "3-7", "8-14", "15-30", "30+"],
+            )
+            aging_summary = aging_df.groupby("aging_bucket", observed=False).size().reset_index(name="tasks")
+            fig = px.bar(aging_summary, x="aging_bucket", y="tasks", labels={"aging_bucket": "Faixa", "tasks": "Tarefas"})
+            fig.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10))
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Sem backlog aberto para aging.")
 
 
 def main():
     st.set_page_config(page_title="Todoist Command Center", layout="wide")
+    pio.templates.default = "plotly_dark"
     _inject_styles()
     settings = get_settings()
     db = Database(settings.database_path)
     client = TodoistClient(settings.todoist_api_token)
-
-    st.title("Todoist Flight Deck")
-    st.caption("Centro de comando pessoal para produtividade, foco e backlog.")
 
     with st.sidebar:
         st.subheader("Sincronizacao")
@@ -483,7 +635,7 @@ def main():
         else:
             st.info("Defina `TODOIST_API_TOKEN` para carregar dados reais.")
 
-    tasks, projects, metric_history = _load_data(db)
+    tasks, projects, metric_history, sync_state = _load_data(db)
     metrics = compute_metrics(tasks, projects)
     db.save_metrics(date.today(), metrics)
     project_index = metrics["project_index"]
@@ -498,6 +650,7 @@ def main():
     filtered_df = _apply_filters(task_df, selected_root, selected_priority, show_completed)
     focused = build_focus_list(tasks, projects)
 
+    _render_header(metrics, filtered_df, sync_state)
     _flight_deck(metrics, filtered_df)
     st.write("")
     _render_kpis(metrics, metric_history)

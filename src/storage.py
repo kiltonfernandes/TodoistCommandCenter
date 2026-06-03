@@ -96,6 +96,14 @@ class Database:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def fetch_sync_state(self, source: str = "todoist") -> dict | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM sync_state WHERE source = ?",
+                (source,),
+            ).fetchone()
+        return dict(row) if row else None
+
     def upsert_projects(self, projects: list[dict]) -> None:
         now = datetime.utcnow().isoformat()
         with self.connect() as conn:
