@@ -44,6 +44,13 @@ def _task_priority(task_row) -> int:
     return int(value or 1)
 
 
+def _task_value(task_row, key: str, default=None):
+    try:
+        return task_row[key]
+    except Exception:
+        return default
+
+
 def build_project_index(project_rows) -> dict[str, ProjectNode]:
     raw = {row["project_id"]: row for row in project_rows}
     memo: dict[str, ProjectNode] = {}
@@ -111,26 +118,26 @@ def compute_metrics(tasks, projects) -> dict:
     this_week_start = today - timedelta(days=today.weekday())
     project_index = build_project_index(projects)
     project_map = {project_id: node.path for project_id, node in project_index.items()}
-    open_tasks = [t for t in tasks if t["status"] == "open"]
-    completed_tasks = [t for t in tasks if t["status"] == "completed"]
-    overdue_tasks = [t for t in open_tasks if _parse_date(t["due_date"]) and _parse_date(t["due_date"]) < today]
-    no_date_tasks = [t for t in open_tasks if not t["due_date"]]
-    due_today = [t for t in open_tasks if _parse_date(t["due_date"]) == today]
+    open_tasks = [t for t in tasks if _task_value(t, "status") == "open"]
+    completed_tasks = [t for t in tasks if _task_value(t, "status") == "completed"]
+    overdue_tasks = [t for t in open_tasks if _parse_date(_task_value(t, "due_date")) and _parse_date(_task_value(t, "due_date")) < today]
+    no_date_tasks = [t for t in open_tasks if not _task_value(t, "due_date")]
+    due_today = [t for t in open_tasks if _parse_date(_task_value(t, "due_date")) == today]
     due_next_7 = [
         t
         for t in open_tasks
-        if _parse_date(t["due_date"]) and today <= _parse_date(t["due_date"]) <= today + timedelta(days=7)
+        if _parse_date(_task_value(t, "due_date")) and today <= _parse_date(_task_value(t, "due_date")) <= today + timedelta(days=7)
     ]
-    completed_today = [t for t in completed_tasks if t["completed_at"] and t["completed_at"].startswith(today.isoformat())]
+    completed_today = [t for t in completed_tasks if _task_value(t, "completed_at") and _task_value(t, "completed_at").startswith(today.isoformat())]
     created_week = [
         t
         for t in tasks
-        if t["created_at"] and datetime.fromisoformat(t["created_at"].replace("Z", "+00:00")).date() >= this_week_start
+        if _task_value(t, "created_at") and datetime.fromisoformat(_task_value(t, "created_at").replace("Z", "+00:00")).date() >= this_week_start
     ]
     completed_week = [
         t
         for t in completed_tasks
-        if t["completed_at"] and datetime.fromisoformat(t["completed_at"].replace("Z", "+00:00")).date() >= this_week_start
+        if _task_value(t, "completed_at") and datetime.fromisoformat(_task_value(t, "completed_at").replace("Z", "+00:00")).date() >= this_week_start
     ]
     completion_rate = round((len(completed_week) / max(1, len(created_week))) * 100, 1)
     focus_score = max(
@@ -164,21 +171,21 @@ def build_focus_list(tasks, projects, limit: int = 10) -> list[FocusedTask]:
     project_index = build_project_index(projects)
     focused = []
     for task in tasks:
-        if task["status"] != "open":
+        if _task_value(task, "status") != "open":
             continue
-        node = project_index.get(task["project_id"])
+        node = project_index.get(_task_value(task, "project_id"))
         project_name = node.path if node else "Sem projeto"
         score, reason = compute_task_score(task, project_name)
         focused.append(
             FocusedTask(
-                task_id=task["task_id"],
-                content=task["content"],
+                task_id=_task_value(task, "task_id") or _task_value(task, "id") or "",
+                content=_task_value(task, "content") or "",
                 project_name=project_name,
                 score=score,
                 reason=reason,
-                due_date=task["due_date"],
+                due_date=_task_value(task, "due_date"),
                 priority=_task_priority(task),
-                labels=json.loads(task["labels_json"] or "[]"),
+                labels=json.loads(_task_value(task, "labels_json") or "[]"),
             )
         )
     focused.sort(key=lambda item: item.score, reverse=True)
