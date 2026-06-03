@@ -1,6 +1,5 @@
 __pycache__/
 *.pyc
-.streamlit/
 todoist_command_center.sqlite3
 .env
 .venv/

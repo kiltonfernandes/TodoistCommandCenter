@@ -39,6 +39,7 @@ The recommended hosting path for this V1 is Streamlit Community Cloud.
 3. Connect your GitHub account.
 4. Choose this repository and set `app.py` as the entry point.
 5. Add the secret `TODOIST_API_TOKEN` in the app settings.
+6. Set the app entry point to `app.py`.
 
 ### Why Streamlit Cloud
 
@@ -50,3 +51,4 @@ The recommended hosting path for this V1 is Streamlit Community Cloud.
 
 - The app uses the Todoist REST API v2 for data sync.
 - If no token is set, the dashboard still opens with empty demo-safe state.
+- For local development, copy `.streamlit/secrets.toml.example` if you prefer Streamlit secrets over environment variables.
