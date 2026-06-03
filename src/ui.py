@@ -442,7 +442,7 @@ def _render_priority_matrix(task_df):
         labels={"x": "Prazo", "y": "Prioridade", "color": "Tarefas"},
     )
     fig.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, key="risk_matrix_priority_deadline")
 
 
 def _render_workload_allocation(task_df):
@@ -460,7 +460,7 @@ def _render_workload_allocation(task_df):
         tree = task_df.groupby(["root_name", "priority_label"]).size().reset_index(name="tasks")
         fig = px.treemap(tree, path=["root_name", "priority_label"], values="tasks", hover_data=["tasks"])
         fig.update_layout(height=420, margin=dict(l=10, r=10, t=10, b=10))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, key="workload_treemap_detail")
 
 
 def _render_insights(task_df, metrics):
@@ -568,7 +568,7 @@ def _render_analytics(task_df):
                     labels={"x": "Dia", "y": "Prioridade", "color": "Tarefas"},
                 )
                 fig.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10))
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True, key="deadline_heatmap")
             else:
                 st.info("Sem prazos suficientes para o heatmap.")
         with right:
@@ -593,7 +593,7 @@ def _render_analytics(task_df):
             fig.add_trace(go.Bar(x=merged["week"], y=merged["completed"], name="Concluidas"))
             fig.add_trace(go.Scatter(x=merged["week"], y=merged["created"] - merged["completed"], name="Net backlog", mode="lines+markers"))
             fig.update_layout(barmode="group", xaxis_title="Semana", yaxis_title="Tarefas", height=320)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, key="velocity_telemetry")
         with right:
             _render_workload_allocation(task_df)
     with tab_backlog:
@@ -608,7 +608,7 @@ def _render_analytics(task_df):
             aging_summary = aging_df.groupby("aging_bucket", observed=False).size().reset_index(name="tasks")
             fig = px.bar(aging_summary, x="aging_bucket", y="tasks", labels={"aging_bucket": "Faixa", "tasks": "Tarefas"})
             fig.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, key="backlog_aging")
         else:
             st.info("Sem backlog aberto para aging.")
 
