@@ -37,7 +37,11 @@ def _priority_to_weight(priority: int) -> int:
 
 
 def _task_priority(task_row) -> int:
-    return int(task_row.get("priority") or 1)
+    try:
+        value = task_row["priority"]
+    except Exception:
+        value = None
+    return int(value or 1)
 
 
 def build_project_index(project_rows) -> dict[str, ProjectNode]:
