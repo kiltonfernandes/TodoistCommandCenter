@@ -113,6 +113,7 @@ class Database:
             for task in tasks:
                 due = task.get("due") or {}
                 due_date = due.get("date")
+                created_at = task.get("added_at") or task.get("created_at")
                 conn.execute(
                     """
                     INSERT INTO tasks(task_id, content, project_id, priority, due_date, created_at, completed_at, status, labels_json, url, description, raw_json, updated_at)
@@ -137,9 +138,9 @@ class Database:
                         task.get("project_id"),
                         int(task.get("priority", 1)),
                         due_date,
-                        task.get("created_at"),
+                        created_at,
                         task.get("completed_at"),
-                        "completed" if task.get("is_completed") else "open",
+                        "completed" if task.get("checked") or task.get("is_completed") else "open",
                         json.dumps(task.get("labels", []), ensure_ascii=False),
                         task.get("url"),
                         task.get("description"),
